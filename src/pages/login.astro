@@ -1,0 +1,95 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Login — Kasurra">
+    <main class="auth-page">
+        <section class="auth-panel" aria-labelledby="auth-title">
+            <div>
+                <p class="eyebrow">Kasurra</p>
+                <h1 id="auth-title">Welcome back</h1>
+                <p class="auth-copy">Sign in to keep your expenses, income, and categories tied to your account.</p>
+            </div>
+
+            <div class="auth-tabs" role="tablist" aria-label="Authentication mode">
+                <button class="auth-tab active" type="button" data-mode="login">Login</button>
+                <button class="auth-tab" type="button" data-mode="register">Create account</button>
+            </div>
+
+            <form id="auth-form" class="auth-form">
+                <label id="name-field" class="auth-field" style="display: none;">
+                    Name
+                    <input id="auth-name" name="name" type="text" autocomplete="name" />
+                </label>
+                <label class="auth-field">
+                    Email
+                    <input id="auth-email" name="email" type="email" autocomplete="email" required />
+                </label>
+                <label class="auth-field">
+                    Password
+                    <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" required />
+                </label>
+                <p id="auth-message" class="auth-message" aria-live="polite"></p>
+                <button id="auth-submit" class="btn-confirm" type="submit">Login</button>
+            </form>
+        </section>
+    </main>
+</Layout>
+
+<script>
+    let mode: 'login' | 'register' = 'login';
+
+    const form = document.getElementById('auth-form') as HTMLFormElement;
+    const nameField = document.getElementById('name-field') as HTMLElement;
+    const nameInput = document.getElementById('auth-name') as HTMLInputElement;
+    const emailInput = document.getElementById('auth-email') as HTMLInputElement;
+    const passwordInput = document.getElementById('auth-password') as HTMLInputElement;
+    const message = document.getElementById('auth-message') as HTMLElement;
+    const submit = document.getElementById('auth-submit') as HTMLButtonElement;
+
+    function setMode(nextMode: 'login' | 'register') {
+        mode = nextMode;
+        document.querySelectorAll('.auth-tab').forEach((tab) => {
+            tab.classList.toggle('active', (tab as HTMLElement).dataset.mode === mode);
+        });
+        nameField.style.display = mode === 'register' ? 'grid' : 'none';
+        nameInput.required = mode === 'register';
+        passwordInput.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
+        submit.textContent = mode === 'register' ? 'Create account' : 'Login';
+        message.textContent = '';
+    }
+
+    document.querySelectorAll('.auth-tab').forEach((tab) => {
+        tab.addEventListener('click', () => setMode((tab as HTMLElement).dataset.mode as 'login' | 'register'));
+    });
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        submit.disabled = true;
+        message.textContent = '';
+
+        const payload = {
+            name: nameInput.value.trim(),
+            email: emailInput.value.trim(),
+            password: passwordInput.value
+        };
+
+        try {
+            const res = await fetch(`/api/auth/${mode}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                message.textContent = data.error || 'Something went wrong.';
+                return;
+            }
+
+            window.location.href = '/dashboard';
+        } finally {
+            submit.disabled = false;
+        }
+    });
+</script>

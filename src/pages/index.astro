@@ -1,0 +1,104 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const user = Astro.locals.user;
+---
+
+<Layout title="Kasurra — Calm Budgeting">
+    <main class="landing-page">
+        <section class="landing-hero" aria-labelledby="landing-title">
+            <nav class="landing-nav" aria-label="Main navigation">
+                <a class="landing-logo" href="/">Kasurra<span>smart budgeting</span></a>
+                <div class="landing-links">
+                    <a href="/login">Login</a>
+                    <a class="landing-nav-button" href={user ? "/dashboard" : "/login"}>
+                        {user ? "Open dashboard" : "Start now"}
+                    </a>
+                </div>
+            </nav>
+            <div class="landing-hero-copy">
+                <p class="eyebrow">Private budgets for real life</p>
+                <h1 id="landing-title">Know where your money went before the month gets away.</h1>
+                <p>
+                    Track expenses, income, categories, and monthly balance in one quiet workspace.
+                </p>
+                <div class="landing-actions">
+                    <a class="landing-primary" href={user ? "/dashboard" : "/login"}>
+                        {user ? "Go to dashboard" : "Create your budget"}
+                    </a>
+                    <a class="landing-secondary" href="/login">Login</a>
+                </div>
+            </div>
+            <div class="landing-preview" aria-label="Budget snapshot">
+                <div class="landing-preview-top">
+                    <span>April balance</span>
+                    <strong>€1,248.40</strong>
+                </div>
+                <div class="landing-preview-row">
+                    <span>Groceries</span>
+                    <strong>-€46.20</strong>
+                </div>
+                <div class="landing-preview-row">
+                    <span>Salary</span>
+                    <strong class="positive">+€2,400.00</strong>
+                </div>
+                <div class="landing-preview-row">
+                    <span>Transport</span>
+                    <strong>-€18.90</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="landing-section" aria-labelledby="landing-flow-title">
+            <div class="landing-section-head">
+                <p class="eyebrow">Daily rhythm</p>
+                <h2 id="landing-flow-title">Small entries, clear months.</h2>
+            </div>
+            <div class="landing-flow">
+                <article>
+                    <span>01</span>
+                    <h3>Add the moment</h3>
+                    <p>Coffee, groceries, rent, salary, gifts. The record lands in your account only.</p>
+                </article>
+                <article>
+                    <span>02</span>
+                    <h3>Sort the pattern</h3>
+                    <p>Categories keep the picture readable without turning budgeting into homework.</p>
+                </article>
+                <article>
+                    <span>03</span>
+                    <h3>Read the month</h3>
+                    <p>Income, spending, daily average, and remaining balance stay close at hand.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="landing-split" aria-labelledby="landing-account-title">
+            <div>
+                <p class="eyebrow">Your account</p>
+                <h2 id="landing-account-title">Every user gets their own records.</h2>
+                <p>
+                    Sign in once, then add expenses and income without passing user IDs through the browser.
+                    Your categories and transactions stay tied to your session.
+                </p>
+                <a class="landing-primary" href={user ? "/dashboard" : "/login"}>
+                    {user ? "Continue budgeting" : "Make an account"}
+                </a>
+            </div>
+            <div class="landing-ledger" aria-label="Account privacy notes">
+                <div>
+                    <span>Session</span>
+                    <strong>HTTP-only cookie</strong>
+                </div>
+                <div>
+                    <span>Records</span>
+                    <strong>Scoped by account</strong>
+                </div>
+                <div>
+                    <span>Categories</span>
+                    <strong>Seeded per user</strong>
+                </div>
+            </div>
+        </section>
+    </main>
+</Layout>

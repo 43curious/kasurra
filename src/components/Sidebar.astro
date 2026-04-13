@@ -1,0 +1,50 @@
+---
+const pathname = new URL(Astro.request.url).pathname;
+const isActive = (path: string) => pathname === path ? 'active' : '';
+---
+
+<aside class="sidebar" id="sidebar">
+    <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar" aria-label="Toggle Sidebar">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    <div class="logo">Kasurra<span>smart budgeting</span></div>
+
+    <div class="nav-section">Views</div>
+    <a href="/dashboard" class={`nav-item ${isActive('/dashboard')}`} id="nav-dashboard">
+        <span class="nav-icon">⌂</span>
+        <span>Dashboard</span>
+    </a>
+    <a href="/income" class={`nav-item ${isActive('/income')}`} id="nav-income">
+        <span class="nav-icon">↗</span>
+        <span>Income</span>
+    </a>
+    <a href="/yearly" class={`nav-item ${isActive('/yearly')}`} id="nav-yearly">
+        <span class="nav-icon">▥</span>
+        <span>Yearly</span>
+    </a>
+    <a href="/all-expenses" class={`nav-item ${isActive('/all-expenses')}`} id="nav-all">
+        <span class="nav-icon">☰</span>
+        <span>Transactions</span>
+    </a>
+    <a href="/calendar" class={`nav-item ${isActive('/calendar')}`} id="nav-calendar">
+        <span class="nav-icon">□</span>
+        <span>Calendar</span>
+    </a>
+    <a href="/categories" class={`nav-item ${isActive('/categories')}`} id="nav-categories">
+        <span class="nav-icon">◫</span>
+        <span>Categories</span>
+    </a>
+
+    <div class="nav-section">System</div>
+    <a href="/settings" class={`nav-item ${isActive('/settings') || isActive('/profile')}`} id="nav-settings" title="Settings">
+        <span class="nav-icon">⚙</span>
+        <span>Settings</span>
+    </a>
+
+    <div class="sidebar-total">
+        <div class="label">This month</div>
+        <div class="amount" id="sidebar-total">€0.00</div>
+    </div>
+</aside>

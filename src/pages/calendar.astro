@@ -1,0 +1,87 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+---
+
+<AppLayout
+    title="Spending Calendar — Kasurra"
+    suppressStats={true}
+    pageTitle="Calendar"
+    pageSubtitle="See how your spending lands across each day of the month."
+>
+    <div id="view-calendar" class="panel-view" style="padding: 12px 0 0;">
+        <div class="calendar-container" id="calendar-grid">
+            <!-- Calendar will be rendered here -->
+        </div>
+    </div>
+</AppLayout>
+
+<script>
+    import { API } from '../lib/api';
+    import { Store } from '../lib/store';
+    import { UI } from '../lib/ui-utils';
+    import { Renderers } from '../lib/renderers';
+
+    async function renderCalendar() {
+        const month = Store.getCurrentMonth();
+        const year = Store.getCurrentYear();
+        const records = await API.loadRecords();
+        
+        const el = document.getElementById('calendar-grid');
+        if (!el) return;
+
+        const filteredByMonth = records.filter(r => {
+            const [ry, rm] = r.date.split('-');
+            return parseInt(rm) - 1 === month && parseInt(ry) === year;
+        });
+
+        Renderers.renderSidebarTotal(filteredByMonth);
+
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDay = new Date(year, month, 1).getDay();
+        const expenses = filteredByMonth.filter(r => r.type === 'expense');
+
+        const dailyTotals: Record<number, number> = {};
+        expenses.forEach(e => {
+            const d = parseInt(e.date.split('-')[2]);
+            dailyTotals[d] = (dailyTotals[d] || 0) + e.amount;
+        });
+
+        const maxSpend = Math.max(...Object.values(dailyTotals), 1);
+        const monthName = new Date(year, month).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+        let html = `
+            <div class="calendar-title" style="margin-bottom: 24px; font-size: 20px; font-weight: 600; text-transform: capitalize;">${monthName}</div>
+            <div class="calendar-header">
+                <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+            </div>
+            <div class="calendar-grid">`;
+
+        for (let i = 0; i < firstDay; i++) html += '<div class="calendar-day empty"></div>';
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const total = dailyTotals[d] || 0;
+            const intensity = total > 0 ? Math.min(total / (maxSpend * 0.8), 1) : 0;
+            const color = total > 0 ? `rgba(239, 68, 68, ${0.1 + intensity * 0.9})` : 'transparent';
+            const today = new Date();
+            const isSelected = (today.getDate() === d && today.getMonth() === month && today.getFullYear() === year);
+            
+            html += `
+                <div class="calendar-day ${isSelected ? 'today' : ''}" style="background: ${color}">
+                    <div class="day-num">${d}</div>
+                    ${total > 0 ? `<div class="day-amt">€${total.toFixed(0)}</div>` : ''}
+                </div>`;
+        }
+
+        html += '</div>';
+        el.innerHTML = html;
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        UI.initSidebar();
+        const hasUser = await API.requireUser();
+        if (!hasUser) return;
+        UI.initMonthNavigation(renderCalendar);
+        UI.bindDataRefresh(renderCalendar);
+        renderCalendar();
+    });
+</script>

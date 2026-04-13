@@ -1,0 +1,449 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import YearlyTracking from "../components/YearlyTracking.astro";
+---
+
+<AppLayout title="Yearly Overview — Kasurra" suppressStats={true} pageTitle="Yearly" pageSubtitle="Track how each month rolled up across the full year.">
+    <div id="view-yearly" class="panel-view">
+        <YearlyTracking />
+    </div>
+</AppLayout>
+
+<script>
+    import { API } from '../lib/api';
+    import { Store } from '../lib/store';
+    import { UI } from '../lib/ui-utils';
+    import { Renderers } from '../lib/renderers';
+    import type { Category, Pool } from '../lib/types';
+
+    let expenseCategories: Category[] = [];
+
+    function formatMoney(value: number) {
+        return `€${value.toFixed(2)}`;
+    }
+
+    function escapeHtml(value: string) {
+        return UI.esc(value);
+    }
+
+    function renderPoolCard(pool: Pool) {
+        const isRollover = pool.type === 'rollover';
+        const targetMarkup = typeof pool.target === 'number' && pool.target > 0
+            ? `
+                <div class="pool-progress">
+                    <div class="pool-progress-row">
+                        <span>Target</span>
+                        <span>${formatMoney(pool.target)}</span>
+                    </div>
+                    <div class="pool-progress-bar">
+                        <div class="pool-progress-fill" style="width: ${Math.min((pool.availableBalance / pool.target) * 100, 100)}%"></div>
+                    </div>
+                </div>
+            `
+            : '';
+
+        const categoriesMarkup = pool.linkedCategories.length > 0
+            ? `
+                <div class="pool-categories">
+                    ${pool.linkedCategories.map((category) => `
+                        <span class="pool-category-tag">
+                            <span>${escapeHtml(category.emoji)}</span>
+                            <span>${escapeHtml(category.name)}</span>
+                        </span>
+                    `).join('')}
+                </div>
+            `
+            : !isRollover ? '<p class="pool-meta">No categories linked yet.</p>' : '';
+        
+        const historyMarkup = pool.withdrawals && pool.withdrawals.length > 0
+            ? `
+                <div class="pool-history" id="history-${pool.id}" style="display: none;">
+                    <h6>Recent Withdrawals</h6>
+                    ${pool.withdrawals.slice(0, 5).map(w => `
+                        <div class="pool-history-item">
+                            <span>${w.description || 'Withdrawal'}</span>
+                            <span class="neg">-${formatMoney(w.amount)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : '';
+
+        return `
+            <article class="pool-item ${isRollover ? 'rollover-pool' : 'savings-pool'} ${pool.isClosed ? 'closed-pool' : ''}">
+                <div class="pool-status-header">
+                    <span class="pool-type-chip">${isRollover ? 'Rollover' : (pool.isClosed ? 'Completed' : 'Savings pool')}</span>
+                    ${!isRollover ? `
+                    <button class="btn-pool-status" data-id="${pool.id}" data-closed="${pool.isClosed}" title="${pool.isClosed ? 'Reopen pool' : 'Mark as done'}">
+                        ${pool.isClosed ? '↺' : '✓'}
+                    </button>
+                    ` : ''}
+                </div>
+                <div class="pool-item-head">
+                    <div>
+                        <strong>${escapeHtml(pool.name)}</strong>
+                    </div>
+                    <div class="pool-balance-group">
+                        <span class="pool-balance">${formatMoney(pool.availableBalance)}</span>
+                        ${pool.totalWithdrawals > 0 ? `<span class="pool-balance-sub">from ${formatMoney(pool.balance)} saved</span>` : ''}
+                    </div>
+                </div>
+                <div class="pool-meta">
+                    ${!isRollover ? `<span>${pool.linkedCategories.length} linked ${pool.linkedCategories.length === 1 ? 'category' : 'categories'}</span>` : ''}
+                    ${pool.target ? `<span>${Math.min((pool.availableBalance / pool.target) * 100, 999).toFixed(0)}% of target</span>` : (!isRollover ? '<span>No target</span>' : '')}
+                </div>
+                ${targetMarkup}
+                ${categoriesMarkup}
+                ${historyMarkup}
+                
+                ${!isRollover && !pool.isClosed ? `
+                <div class="pool-actions">
+                    <button class="btn-pool-withdraw" data-id="${pool.id}" data-name="${escapeHtml(pool.name)}">
+                        Withdraw
+                    </button>
+                    ${pool.withdrawals && pool.withdrawals.length > 0 ? `
+                    <button class="btn-pool-history-toggle" data-id="${pool.id}">
+                        History
+                    </button>
+                    ` : ''}
+                </div>
+                ` : !isRollover && pool.isClosed && pool.withdrawals && pool.withdrawals.length > 0 ? `
+                <div class="pool-actions">
+                    <button class="btn-pool-history-toggle" data-id="${pool.id}">
+                        View History
+                    </button>
+                </div>
+                ` : ''}
+            </article>
+        `;
+    }
+
+    function renderPools(pools: Pool[]) {
+        const yearlyRolloverEl = document.getElementById('yearly-rollover');
+        const yearlyBankEl = document.getElementById('yearly-bank-balance');
+        const poolsGrid = document.getElementById('savings-pools-grid');
+        const rollover = pools.find((pool) => pool.type === 'rollover');
+        const savingsPools = pools.filter((pool) => pool.type === 'savings');
+        const addPoolCard = `
+            <button class="pool-add-card" id="btn-add-pool" type="button">
+                <span class="pool-add-mark">+</span>
+                <span class="pool-add-copy">
+                    <strong>New pool</strong>
+                    <span>Create a custom savings pool</span>
+                </span>
+            </button>
+        `;
+
+        if (yearlyRolloverEl && rollover) {
+            yearlyRolloverEl.textContent = formatMoney(rollover.balance);
+        }
+
+        if (!poolsGrid) return;
+
+        if (savingsPools.length === 0) {
+            poolsGrid.innerHTML = `
+                <div class="pool-item empty-pool">
+                    <strong>No savings pools yet</strong>
+                    <span>Create a pool to group categories like travel, repairs, or annual bills.</span>
+                </div>
+                ${addPoolCard}
+            `;
+            attachPoolHandlers();
+            return;
+        }
+
+        poolsGrid.innerHTML = `${savingsPools.map(renderPoolCard).join('')}${addPoolCard}`;
+        attachPoolHandlers();
+    }
+
+    function attachPoolHandlers() {
+        document.getElementById('btn-add-pool')?.addEventListener('click', () => {
+            renderPoolCategoryOptions();
+            setPoolModalOpen(true);
+        });
+
+        document.getElementById('btn-edit-bank')?.addEventListener('click', async () => {
+            const user = await API.getUser();
+            openBankModal(user.bankBalance);
+        });
+
+        document.querySelectorAll('.btn-pool-withdraw').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const b = e.currentTarget as HTMLElement;
+                openWithdrawModal(b.dataset.id!, b.dataset.name!);
+            });
+        });
+
+        document.querySelectorAll('.btn-pool-history-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = (e.currentTarget as HTMLElement).dataset.id;
+                const h = document.getElementById(`history-${id}`);
+                if (h) h.style.display = h.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+
+        document.querySelectorAll('.btn-pool-status').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const b = e.currentTarget as HTMLElement;
+                const poolId = b.dataset.id!;
+                const isClosed = b.dataset.closed === 'true';
+                
+                if (!isClosed) {
+                    if (!confirm('Mark this pool as completed? This will hide withdrawal actions.')) return;
+                }
+                
+                await API.togglePoolStatus(poolId, !isClosed);
+                renderYearly();
+            });
+        });
+    }
+
+    function openBankModal(current: number) {
+        const modal = document.getElementById('bank-modal');
+        const input = document.getElementById('bank-amount') as HTMLInputElement;
+        if (!modal || !input) return;
+        input.value = current.toString();
+        modal.style.display = 'flex';
+    }
+
+    function closeBankModal() {
+        const modal = document.getElementById('bank-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function saveBankBalance() {
+        const amount = Number((document.getElementById('bank-amount') as HTMLInputElement).value);
+        if (isNaN(amount)) return;
+        
+        await API.updateUser({ bankBalance: amount });
+        UI.showToast('Bank balance updated');
+        closeBankModal();
+        renderYearly();
+    }
+
+    function openWithdrawModal(id: string, name: string) {
+        const modal = document.getElementById('withdraw-modal');
+        const title = document.getElementById('withdraw-pool-name');
+        const idInput = document.getElementById('withdraw-pool-id') as HTMLInputElement;
+        if (!modal || !title || !idInput) return;
+        
+        title.textContent = name;
+        idInput.value = id;
+        modal.style.display = 'flex';
+        
+        UI.initDateInputBounds('withdraw-date');
+    }
+
+    function closeWithdrawModal() {
+        const modal = document.getElementById('withdraw-modal');
+        if (modal) modal.style.display = 'none';
+        
+        (document.getElementById('withdraw-amount') as HTMLInputElement).value = '';
+        (document.getElementById('withdraw-desc') as HTMLInputElement).value = '';
+    }
+
+    async function submitWithdrawal() {
+        const id = (document.getElementById('withdraw-pool-id') as HTMLInputElement).value;
+        const amount = Number((document.getElementById('withdraw-amount') as HTMLInputElement).value);
+        const description = (document.getElementById('withdraw-desc') as HTMLInputElement).value;
+        const date = (document.getElementById('withdraw-date') as HTMLInputElement).value;
+
+        if (!amount || amount <= 0) {
+            UI.showToast('Enter a valid amount');
+            return;
+        }
+
+        try {
+            await API.withdrawFromPool({ poolId: id, amount, description, date });
+            UI.showToast('Withdrawal recorded');
+            closeWithdrawModal();
+            renderYearly();
+        } catch (e) {
+            UI.showToast('Error recording withdrawal');
+        }
+    }
+
+    function renderPoolCategoryOptions() {
+        const picker = document.getElementById('pool-category-picker');
+        if (!picker) return;
+
+        picker.innerHTML = expenseCategories.map((category) => `
+            <label class="pool-category-option">
+                <input type="checkbox" value="${category.id}">
+                <span class="pool-category-copy">
+                    <span class="pool-category-swatch" style="background: ${category.color}20; color: ${category.color}">
+                        ${escapeHtml(category.emoji)}
+                    </span>
+                    <span>${escapeHtml(category.name)}</span>
+                </span>
+            </label>
+        `).join('');
+    }
+
+    function resetPoolForm() {
+        const nameInput = document.getElementById('pool-name') as HTMLInputElement | null;
+        const targetInput = document.getElementById('pool-target') as HTMLInputElement | null;
+        const checkboxes = document.querySelectorAll<HTMLInputElement>('#pool-category-picker input[type="checkbox"]');
+
+        if (nameInput) nameInput.value = '';
+        if (targetInput) targetInput.value = '';
+        checkboxes.forEach((checkbox) => {
+            checkbox.checked = false;
+        });
+    }
+
+    function setPoolModalOpen(isOpen: boolean) {
+        const modal = document.getElementById('pool-modal');
+        if (!modal) return;
+        modal.style.display = isOpen ? 'flex' : 'none';
+        if (!isOpen) resetPoolForm();
+    }
+
+    async function createPool() {
+        const nameInput = document.getElementById('pool-name') as HTMLInputElement | null;
+        const targetInput = document.getElementById('pool-target') as HTMLInputElement | null;
+        const selectedCategories = Array.from(
+            document.querySelectorAll<HTMLInputElement>('#pool-category-picker input[type="checkbox"]:checked')
+        ).map((checkbox) => checkbox.value);
+
+        const name = nameInput?.value.trim() ?? '';
+        if (!name) {
+            UI.showToast('Pool name is required');
+            return;
+        }
+
+        if (selectedCategories.length === 0) {
+            UI.showToast('Pick at least one expense category');
+            return;
+        }
+
+        const targetValue = targetInput?.value.trim() ?? '';
+        const target = targetValue ? Number(targetValue) : null;
+        if (targetValue && (!Number.isFinite(target) || Number(target) < 0)) {
+            UI.showToast('Target must be zero or more');
+            return;
+        }
+
+        await API.addPool({
+            name,
+            linkedCategoryIds: selectedCategories,
+            target
+        });
+
+        UI.showToast('Savings pool created');
+        setPoolModalOpen(false);
+        renderYearly();
+    }
+
+    function initPoolModal() {
+        document.getElementById('btn-cancel-pool')?.addEventListener('click', () => {
+            setPoolModalOpen(false);
+        });
+
+        document.getElementById('btn-save-pool')?.addEventListener('click', async () => {
+            await createPool();
+        });
+
+        document.getElementById('pool-modal')?.addEventListener('click', (event) => {
+            if (event.target === event.currentTarget) {
+                setPoolModalOpen(false);
+            }
+        });
+
+        // Withdraw modal listeners
+        document.getElementById('btn-cancel-withdraw')?.addEventListener('click', closeWithdrawModal);
+        document.getElementById('btn-confirm-withdraw')?.addEventListener('click', submitWithdrawal);
+
+        // Bank modal listeners
+        document.getElementById('btn-cancel-bank')?.addEventListener('click', closeBankModal);
+        document.getElementById('btn-save-bank')?.addEventListener('click', saveBankBalance);
+    }
+
+    async function renderYearly() {
+        const year = Store.getCurrentYear();
+        const [all, pools, user] = await Promise.all([
+            API.loadRecords(),
+            API.loadPools(year),
+            API.getUser()
+        ]);
+        
+        const yearlyGrid = document.getElementById('yearly-months-grid');
+        const yearlyBankEl = document.getElementById('yearly-bank-balance');
+
+        if (yearlyBankEl) {
+            yearlyBankEl.textContent = formatMoney(user.bankBalance);
+        }
+
+        // Auto-prompt bank balance if 0
+        if (user.bankBalance === 0 && !sessionStorage.getItem('bank_prompted')) {
+            openBankModal(0);
+            sessionStorage.setItem('bank_prompted', 'true');
+        }
+        
+        const monthsData = Array.from({length: 12}, (_, i) => ({
+            index: i,
+            name: new Date(year, i).toLocaleDateString('es-ES', { month: 'long' }),
+            income: 0,
+            expense: 0
+        }));
+
+        all.forEach(r => {
+            const d = new Date(r.date);
+            if (d.getFullYear() === year) {
+                const m = d.getMonth();
+                if (r.type === 'income') monthsData[m].income += r.amount;
+                else monthsData[m].expense += r.amount;
+            }
+        });
+
+        if (yearlyGrid) {
+            yearlyGrid.innerHTML = monthsData.map(m => {
+                const net = m.income - m.expense;
+                const isFuture = m.index > new Date().getMonth() && year === new Date().getFullYear();
+                
+                return `
+                    <div class="month-card ${isFuture ? 'future' : ''}">
+                        <span class="m-name">${m.name}</span>
+                        <div class="m-stats">
+                            <div class="m-stat-row income">
+                                <span class="m-stat-label">
+                                    <span class="m-stat-icon">↑</span>
+                                    <span>Income</span>
+                                </span>
+                                <span class="m-stat-value">${formatMoney(m.income)}</span>
+                            </div>
+                            <div class="m-stat-row expense">
+                                <span class="m-stat-label">
+                                    <span class="m-stat-icon">↓</span>
+                                    <span>Expenses</span>
+                                </span>
+                                <span class="m-stat-value">${formatMoney(m.expense)}</span>
+                            </div>
+                        </div>
+                        <div class="m-net" style="color: ${net >= 0 ? 'var(--accent)' : 'var(--danger)'}">
+                            ${net >= 0 ? '+' : ''}€${net.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        renderPools(pools);
+        
+        const filteredByMonth = all.filter(r => {
+            const [ry, rm] = r.date.split('-');
+            return parseInt(rm) - 1 === Store.getCurrentMonth() && parseInt(ry) === year;
+        });
+        Renderers.renderSidebarTotal(filteredByMonth);
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        UI.initSidebar();
+        const hasUser = await API.requireUser();
+        if (!hasUser) return;
+        expenseCategories = (await API.loadCategoryList()).filter((category) => category.type === 'expense');
+        initPoolModal();
+        UI.initMonthNavigation(renderYearly);
+        UI.bindDataRefresh(renderYearly);
+        renderYearly();
+    });
+</script>

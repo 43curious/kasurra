@@ -1,0 +1,631 @@
+---
+---
+<div class="yearly-dashboard">
+        <header class="yearly-header">
+            <div class="summary-pool-grid">
+                <div class="pool-card bank-account" id="card-bank-account">
+                    <span class="pool-label">Bank account</span>
+                    <span class="pool-amt" id="yearly-bank-balance">€0.00</span>
+                    <span class="pool-sub">Current available funds</span>
+                    <button class="btn-edit-balance" id="btn-edit-bank">Edit</button>
+                </div>
+                <div class="pool-card rollover">
+                    <span class="pool-label">Total Rollover</span>
+                    <span class="pool-amt" id="yearly-rollover">€0.00</span>
+                    <span class="pool-sub">Savings from monthly budgets</span>
+                </div>
+            </div>
+        </header>
+
+        <section class="savings-pools">
+            <div class="section-header">
+                <h3>Money pools</h3>
+            </div>
+            <div class="pools-grid" id="savings-pools-grid">
+                <!-- Pools will be rendered here -->
+            </div>
+        </section>
+
+        <section class="yearly-grid-section">
+            <h3>Monthly breakdown</h3>
+            <div class="yearly-months-grid" id="yearly-months-grid">
+                <!-- 12 month cards will be rendered here -->
+            </div>
+        </section>
+</div><div id="pool-modal" class="modal" style="display: none;">
+    <div class="modal-content pool-modal-content">
+        <h3>Create Savings Pool</h3>
+        <div class="form-group">
+            <label for="pool-name">Name</label>
+            <input type="text" id="pool-name" placeholder="e.g. Phone savings">
+        </div>
+        <div class="form-group">
+            <label for="pool-target">Target amount (optional)</label>
+            <input type="number" id="pool-target" min="0" step="0.01" placeholder="e.g. 1200">
+        </div>
+        <div class="form-group">
+            <label>Linked expense categories</label>
+            <div class="pool-category-picker" id="pool-category-picker">
+                <!-- Category options will be rendered here -->
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button id="btn-cancel-pool" class="btn-discard">Cancel</button>
+            <button id="btn-save-pool" class="btn-confirm">Save Pool</button>
+        </div>
+    </div>
+</div>
+
+<div id="withdraw-modal" class="modal" style="display: none;">
+    <div class="modal-content pool-modal-content">
+        <h3 id="withdraw-title">Withdraw from Pool</h3>
+        <p id="withdraw-pool-name" style="margin-top: -12px; margin-bottom: 24px; color: var(--muted); font-weight: 600;"></p>
+        <input type="hidden" id="withdraw-pool-id">
+        <div class="form-group">
+            <label for="withdraw-amount">Amount</label>
+            <input type="number" id="withdraw-amount" min="0.01" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+            <label for="withdraw-desc">Description</label>
+            <input type="text" id="withdraw-desc" placeholder="e.g. Bought the phone">
+        </div>
+        <div class="form-group">
+            <label for="withdraw-date">Date</label>
+            <input type="date" id="withdraw-date">
+        </div>
+        <div class="modal-actions">
+            <button id="btn-cancel-withdraw" class="btn-discard">Cancel</button>
+            <button id="btn-confirm-withdraw" class="btn-confirm">Confirm Withdrawal</button>
+        </div>
+    </div>
+</div>
+
+<div id="bank-modal" class="modal" style="display: none;">
+    <div class="modal-content pool-modal-content">
+        <h3>Bank account balance</h3>
+        <p style="margin-top: -12px; margin-bottom: 24px; color: var(--muted); font-size: 14px;">
+            Set your current bank account balance. This will be updated automatically as you record income and expenses.
+        </p>
+        <div class="form-group">
+            <label for="bank-amount">Current Balance</label>
+            <input type="number" id="bank-amount" step="0.01" placeholder="0.00">
+        </div>
+        <div class="modal-actions">
+            <button id="btn-cancel-bank" class="btn-discard">Cancel</button>
+            <button id="btn-save-bank" class="btn-confirm">Save Balance</button>
+        </div>
+    </div>
+</div>
+
+<style is:global>
+    /* ... existing styles ... */
+    .yearly-dashboard .pool-balance-group {
+        text-align: right;
+    }
+    .yearly-dashboard .pool-balance-sub {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+    }
+    .yearly-dashboard .pool-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+    }
+    .yearly-dashboard .btn-pool-withdraw {
+        flex: 1;
+        background: #0f766e;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .yearly-dashboard .btn-pool-withdraw:hover {
+        background: #115e59;
+    }
+    .yearly-dashboard .btn-pool-history-toggle {
+        padding: 8px 12px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+    }
+    .yearly-dashboard .pool-history {
+        margin-top: 16px;
+        padding: 12px;
+        background: var(--surface2);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+    }
+    .yearly-dashboard .pool-history h6 {
+        margin: 0 0 8px;
+        font-size: 11px;
+        text-transform: uppercase;
+        color: var(--muted);
+        letter-spacing: 0.5px;
+    }
+    .yearly-dashboard .pool-history-item {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        padding: 4px 0;
+        border-bottom: 1px dashed var(--border);
+    }
+    .yearly-dashboard .pool-history-item:last-child {
+        border-bottom: none;
+    }
+    .yearly-dashboard .pool-history-item .neg {
+        color: #dc2626;
+        font-weight: 600;
+    }
+
+    .yearly-dashboard .yearly-header {
+        margin-bottom: 28px;
+    }
+    .yearly-dashboard .summary-pool-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    .yearly-dashboard .pool-card {
+        background: var(--surface);
+        padding: 24px 32px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        min-height: 180px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        position: relative;
+    }
+    .yearly-dashboard .bank-account {
+        border-left: 4px solid #10b981;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), transparent 60%), var(--surface);
+    }
+    .yearly-dashboard .bank-account .pool-amt {
+        color: #10b981;
+    }
+    .yearly-dashboard .btn-edit-balance {
+        position: absolute;
+        top: 20px;
+        right: 24px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s, background 0.2s;
+    }
+    .yearly-dashboard .pool-card:hover .btn-edit-balance {
+        opacity: 1;
+    }
+    .yearly-dashboard .btn-edit-balance:hover {
+        background: var(--border);
+        color: var(--text);
+    }
+    .yearly-dashboard .rollover {
+        border-left: 4px solid var(--accent);
+        background: linear-gradient(135deg, rgba(142, 202, 230, 0.18), transparent 60%), var(--surface);
+    }
+    .yearly-dashboard .pool-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        color: var(--muted);
+        letter-spacing: 1px;
+        font-weight: 600;
+        display: block;
+    }
+    .yearly-dashboard .pool-amt {
+        font-family: 'DM Mono', monospace;
+        font-size: 32px;
+        font-weight: 600;
+        margin-top: 8px;
+        display: block;
+        color: var(--accent);
+    }
+    .yearly-dashboard .pool-sub {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 4px;
+        display: block;
+    }
+
+    .yearly-dashboard .savings-pools {
+        margin-bottom: 48px;
+    }
+    .yearly-dashboard .section-header {
+        margin-bottom: 24px;
+    }
+    .yearly-dashboard .section-header h3 {
+        margin: 0;
+    }
+    .yearly-dashboard .pools-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        align-items: stretch;
+    }
+    
+    .yearly-dashboard .pool-item {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        box-shadow: var(--shadow);
+        min-height: 210px;
+        display: flex;
+        flex-direction: column;
+    }
+    .yearly-dashboard .pool-item.savings-pool {
+        border-top: 4px solid #0f766e;
+        background: linear-gradient(180deg, rgba(15, 118, 110, 0.08), transparent 55%), var(--surface);
+    }
+    .yearly-dashboard .pool-item.empty-pool {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        place-items: start;
+    }
+    .yearly-dashboard .pool-item-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: start;
+        margin-bottom: 16px;
+    }
+    .yearly-dashboard .pool-item-head strong {
+        font-size: 20px;
+        line-height: 1.1;
+    }
+    .yearly-dashboard .pool-balance {
+        font-family: 'DM Mono', monospace;
+        font-size: 24px;
+        font-weight: 600;
+        color: #0f766e;
+        white-space: nowrap;
+    }
+    .yearly-dashboard .pool-type-chip {
+        display: inline-flex;
+        width: fit-content;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(15, 118, 110, 0.12);
+        color: #115e59;
+        font-size: 11px;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+    .yearly-dashboard .pool-status-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+    }
+    .yearly-dashboard .btn-pool-status {
+        background: none;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 16px;
+    }
+    .yearly-dashboard .btn-pool-status:hover {
+        background: var(--surface2);
+        color: var(--accent);
+        border-color: var(--accent);
+    }
+    .yearly-dashboard .closed-pool {
+        opacity: 0.7;
+        filter: grayscale(0.5);
+    }
+    .yearly-dashboard .closed-pool .pool-type-chip {
+        background: var(--surface2);
+        color: var(--muted);
+    }
+    .yearly-dashboard .closed-pool .pool-balance {
+        color: var(--muted);
+    }
+    .yearly-dashboard .closed-pool .btn-pool-status {
+        color: var(--accent);
+        border-color: var(--accent);
+    }
+    .yearly-dashboard .pool-categories {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+    }
+    .yearly-dashboard .pool-category-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--muted);
+    }
+    .yearly-dashboard .pool-meta {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        color: var(--muted);
+        font-size: 13px;
+    }
+    .yearly-dashboard .pool-progress {
+        margin-top: 16px;
+    }
+    .yearly-dashboard .pool-progress-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+    }
+    .yearly-dashboard .pool-progress-bar {
+        width: 100%;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--surface2);
+        overflow: hidden;
+        border: 1px solid var(--border);
+    }
+    .yearly-dashboard .pool-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #0f766e, #14b8a6);
+    }
+    .yearly-dashboard .pool-add-card {
+        width: 100%;
+        min-height: 210px;
+        border: 2px dashed #cbd5e1;
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, rgba(148, 163, 184, 0.08), transparent 70%), var(--surface);
+        color: #64748b;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+        transition: border-color 0.2s, transform 0.2s, color 0.2s, background 0.2s;
+        text-align: center;
+        padding: 24px;
+    }
+    .yearly-dashboard .pool-add-card:hover {
+        border-color: #94a3b8;
+        color: #334155;
+        transform: translateY(-2px);
+        background: linear-gradient(180deg, rgba(148, 163, 184, 0.14), transparent 70%), var(--surface);
+    }
+    .yearly-dashboard .pool-add-mark {
+        font-size: 44px;
+        line-height: 1;
+        font-weight: 300;
+    }
+    .yearly-dashboard .pool-add-copy strong {
+        display: block;
+        font-size: 18px;
+        margin-bottom: 6px;
+    }
+    .yearly-dashboard .pool-add-copy span {
+        display: block;
+        font-size: 13px;
+        color: var(--muted);
+    }
+    .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(15, 23, 42, 0.38);
+        backdrop-filter: blur(6px);
+    }
+    .modal-content {
+        width: min(560px, calc(100vw - 32px));
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        padding: 28px;
+    }
+    .modal h3 {
+        margin: 0 0 20px;
+        font-family: 'Playfair Display', serif;
+        font-size: 28px;
+    }
+    .form-group {
+        margin-bottom: 18px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+    .form-group input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface2);
+        color: var(--text);
+    }
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 24px;
+    }
+    .modal-actions button {
+        flex: 0 0 auto;
+    }
+    .pool-category-picker {
+        display: grid;
+        gap: 10px;
+        max-height: 260px;
+        overflow-y: auto;
+        padding: 4px 2px;
+    }
+    .pool-category-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface2);
+    }
+    .pool-category-option input {
+        width: auto;
+        margin: 0;
+    }
+    .pool-category-copy {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+    .pool-category-swatch {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    .yearly-dashboard .yearly-months-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-top: 24px;
+    }
+    .yearly-dashboard .month-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        text-align: left;
+    }
+    .yearly-dashboard .month-card.future {
+        opacity: 0.5;
+        background: var(--surface2);
+    }
+    .yearly-dashboard .m-name {
+        font-family: 'Playfair Display', serif;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1;
+        text-transform: capitalize;
+        display: block;
+    }
+    .yearly-dashboard .m-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .yearly-dashboard .m-stat-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .yearly-dashboard .m-stat-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+    }
+    .yearly-dashboard .m-stat-row.income .m-stat-value,
+    .yearly-dashboard .m-stat-row.income .m-stat-icon {
+        color: #16a34a;
+    }
+    .yearly-dashboard .m-stat-row.expense .m-stat-value,
+    .yearly-dashboard .m-stat-row.expense .m-stat-icon {
+        color: #dc2626;
+    }
+    .yearly-dashboard .m-net {
+        font-family: 'DM Mono', monospace;
+        font-weight: 600;
+        margin-top: auto;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+        font-size: 15px;
+    }
+
+    @media (max-width: 1200px) {
+        .yearly-dashboard .yearly-months-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 900px) {
+        .yearly-dashboard .yearly-months-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+        .yearly-dashboard .yearly-months-grid { grid-template-columns: 1fr; }
+        .yearly-dashboard .pool-item-head {
+            flex-direction: column;
+        }
+        .yearly-dashboard .pool-balance-group {
+            text-align: left;
+            margin-top: 8px;
+        }
+        .yearly-dashboard .pool-balance {
+            white-space: normal;
+        }
+        .modal {
+            padding: 16px;
+        }
+        .modal-content {
+            width: 100%;
+            padding: 22px;
+        }
+        .modal-actions {
+            flex-direction: column-reverse;
+        }
+        .modal-actions button {
+            width: 100%;
+        }
+    }
+</style>
+>

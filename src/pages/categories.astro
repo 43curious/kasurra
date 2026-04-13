@@ -1,0 +1,237 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import CategoriesManage from "../components/CategoriesManage.astro";
+---
+
+<AppLayout
+    title="Categories — Kasurra"
+    suppressStats={true}
+    pageTitle="Categories"
+    pageSubtitle="Organize the labels behind your expense and income flow."
+    showMonthNavigation={false}
+>
+    <div id="view-categories-manage" class="panel-view">
+        <CategoriesManage />
+    </div>
+</AppLayout>
+
+<script>
+    import { API } from '../lib/api';
+    import { UI } from '../lib/ui-utils';
+    import type { Category } from '../lib/types';
+
+    function resetCategoryForm() {
+        const idInput = document.getElementById('cat-edit-id') as HTMLInputElement;
+        const typeInput = document.getElementById('cat-edit-type') as HTMLInputElement;
+        const title = document.getElementById('modal-title');
+        const nameInput = document.getElementById('cat-name') as HTMLInputElement;
+        const emojiInput = document.getElementById('cat-emoji') as HTMLInputElement;
+        const colorInput = document.getElementById('cat-color') as HTMLInputElement;
+        const deleteBtn = document.getElementById('btn-delete-cat') as HTMLButtonElement;
+
+        idInput.value = '';
+        typeInput.value = 'expense';
+        nameInput.value = '';
+        emojiInput.value = '';
+        colorInput.value = '#3b82f6';
+        if (title) title.textContent = 'Add Category';
+        if (deleteBtn) deleteBtn.style.display = 'none';
+    }
+
+    function openCategoryModal(category?: Category) {
+        const modal = document.getElementById('cat-modal');
+        const idInput = document.getElementById('cat-edit-id') as HTMLInputElement;
+        const typeInput = document.getElementById('cat-edit-type') as HTMLInputElement;
+        const title = document.getElementById('modal-title');
+        const nameInput = document.getElementById('cat-name') as HTMLInputElement;
+        const emojiInput = document.getElementById('cat-emoji') as HTMLInputElement;
+        const colorInput = document.getElementById('cat-color') as HTMLInputElement;
+        const deleteBtn = document.getElementById('btn-delete-cat') as HTMLButtonElement;
+
+        resetCategoryForm();
+
+        if (category?.id) {
+            idInput.value = category.id;
+            typeInput.value = category.type;
+            nameInput.value = category.name;
+            emojiInput.value = category.emoji;
+            colorInput.value = category.color;
+            if (title) title.textContent = 'Edit Category';
+            if (deleteBtn) deleteBtn.style.display = 'inline-flex';
+        } else if (category) {
+            typeInput.value = category.type;
+        }
+
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function renderCategoryItem(category: Category) {
+        return `
+            <div class="cat-manage-item" draggable="true" data-id="${category.id}" data-type="${category.type}">
+                <div class="cat-icon" style="background: ${category.color}20; color: ${category.color}">${category.emoji}</div>
+                <div class="cat-manage-labels">
+                    <div class="cat-manage-name">${category.name}</div>
+                    <div class="cat-manage-actions">
+                        <button class="edit-cat-btn" data-id="${category.id}">Edit</button>
+                    </div>
+                </div>
+                <button class="drag-handle" type="button" title="Drag to reorder">⋮⋮</button>
+            </div>
+        `;
+    }
+
+    async function renderCategoriesManage() {
+        const categories = await API.loadCategoryList();
+        
+        const expGrid = document.getElementById('expense-cats-grid');
+        const incGrid = document.getElementById('income-cats-grid');
+        
+        if (expGrid) {
+            expGrid.innerHTML = categories.filter(c => c.type === 'expense').map(renderCategoryItem).join('');
+        }
+        
+        if (incGrid) {
+            incGrid.innerHTML = categories.filter(c => c.type === 'income').map(renderCategoryItem).join('');
+        }
+
+        document.querySelectorAll('.edit-cat-btn').forEach(btn => {
+            (btn as HTMLElement).onclick = async () => {
+                const id = (btn as HTMLElement).dataset.id!;
+                const category = categories.find((item) => item.id === id);
+                if (category) openCategoryModal(category);
+            };
+        });
+
+        document.querySelectorAll('.add-cat-btn').forEach(btn => {
+            (btn as HTMLElement).onclick = () => {
+                openCategoryModal({
+                    id: '',
+                    type: (btn as HTMLElement).dataset.type as 'expense' | 'income',
+                    name: '',
+                    emoji: '',
+                    color: '#3b82f6'
+                });
+            };
+        });
+
+        initDragAndDrop();
+    }
+
+    async function persistCategoryOrder(type: 'expense' | 'income') {
+        const grid = document.getElementById(type === 'expense' ? 'expense-cats-grid' : 'income-cats-grid');
+        if (!grid) return;
+        const orderedIds = Array.from(grid.querySelectorAll<HTMLElement>('.cat-manage-item'))
+            .map((item) => item.dataset.id!)
+            .filter(Boolean);
+        await API.reorderCategories(type, orderedIds);
+    }
+
+    function initDragAndDrop() {
+        let draggedId: string | null = null;
+        let draggedType: 'expense' | 'income' | null = null;
+
+        document.querySelectorAll<HTMLElement>('.cat-manage-item').forEach((item) => {
+            item.addEventListener('dragstart', (event) => {
+                draggedId = item.dataset.id || null;
+                draggedType = item.dataset.type === 'expense' || item.dataset.type === 'income'
+                    ? item.dataset.type
+                    : null;
+                item.classList.add('dragging');
+                event.dataTransfer?.setData('text/plain', draggedId ?? '');
+                if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = 'move';
+                }
+            });
+
+            item.addEventListener('dragend', async () => {
+                item.classList.remove('dragging');
+                if (draggedId && draggedType) {
+                    await persistCategoryOrder(draggedType);
+                    UI.showToast('Category order saved');
+                }
+                draggedId = null;
+                draggedType = null;
+            });
+
+            item.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                const target = event.currentTarget as HTMLElement;
+                if (!draggedId || draggedId === target.dataset.id) return;
+
+                const active = document.querySelector<HTMLElement>(`.cat-manage-item[data-id="${draggedId}"]`);
+                if (!active || active.dataset.type !== target.dataset.type || !target.parentElement) return;
+
+                const rect = target.getBoundingClientRect();
+                const shouldInsertAfter = event.clientY > rect.top + rect.height / 2;
+                if (shouldInsertAfter) {
+                    target.parentElement.insertBefore(active, target.nextSibling);
+                } else {
+                    target.parentElement.insertBefore(active, target);
+                }
+            });
+        });
+    }
+
+    function initCategoryModal() {
+        const modal = document.getElementById('cat-modal');
+        const save = document.getElementById('btn-save-cat');
+        const cancel = document.getElementById('btn-cancel-cat');
+        const remove = document.getElementById('btn-delete-cat');
+        const idInput = document.getElementById('cat-edit-id') as HTMLInputElement;
+        const typeInput = document.getElementById('cat-edit-type') as HTMLInputElement;
+        const nameInput = document.getElementById('cat-name') as HTMLInputElement;
+        const emojiInput = document.getElementById('cat-emoji') as HTMLInputElement;
+        const colorInput = document.getElementById('cat-color') as HTMLInputElement;
+
+        cancel?.addEventListener('click', () => {
+            resetCategoryForm();
+            if (modal) modal.style.display = 'none';
+        });
+
+        save?.addEventListener('click', async () => {
+            const name = nameInput.value.trim();
+            if (!name) return UI.showToast('Category name is required');
+
+            const payload = {
+                id: idInput.value,
+                type: typeInput.value as 'expense' | 'income',
+                name,
+                emoji: emojiInput.value.trim() || '•',
+                color: colorInput.value || '#64748b'
+            };
+
+            if (payload.id) {
+                await API.updateCategory(payload);
+                UI.showToast('Category updated');
+            } else {
+                await API.addCategory(payload);
+                UI.showToast('Category added');
+            }
+
+            resetCategoryForm();
+            if (modal) modal.style.display = 'none';
+            renderCategoriesManage();
+        });
+
+        remove?.addEventListener('click', async () => {
+            const id = idInput.value;
+            if (!id) return;
+            if (!confirm('Delete category? Records in this category will move to "Other".')) return;
+
+            await API.deleteCategory(id);
+            resetCategoryForm();
+            if (modal) modal.style.display = 'none';
+            UI.showToast('Category removed');
+            renderCategoriesManage();
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        UI.initSidebar();
+        initCategoryModal();
+        const hasUser = await API.requireUser();
+        if (!hasUser) return;
+        UI.bindDataRefresh(renderCategoriesManage);
+        renderCategoriesManage();
+    });
+</script>

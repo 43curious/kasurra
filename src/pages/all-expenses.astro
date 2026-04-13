@@ -1,0 +1,117 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import ExpenseList from "../components/ExpenseList.astro";
+---
+
+<AppLayout
+    title="All Transactions — Kasurra"
+    suppressStats={true}
+    pageTitle="Transactions"
+    pageSubtitle="Review every expense and income record in one list."
+>
+    <div id="expense-layout" class="transactions-page">
+        <div id="view-all-charts" class="transactions-chart-panel">
+            <div class="panel-card chart-container">
+                <h4>Expense Breakdown</h4>
+                <div class="chart-canvas-wrap">
+                    <canvas id="expense-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="dashboard-layout full-width transactions-list-panel"
+            id="dashboard-layout"
+        >
+            <div class="dashboard-right" id="dashboard-right">
+                <ExpenseList defaultTab="records" />
+            </div>
+        </div>
+    </div>
+</AppLayout>
+
+<script>
+    import { API } from "../lib/api";
+    import { Store } from "../lib/store";
+    import { UI } from "../lib/ui-utils";
+    import { Renderers } from "../lib/renderers";
+    import type { CategoryMap } from "../lib/types";
+
+    let CATS: CategoryMap = {};
+    let INCOME_CATS: CategoryMap = {};
+    let expenseChart: any;
+
+    declare var Chart: any;
+
+    async function renderAll() {
+        const month = Store.getCurrentMonth();
+        const year = Store.getCurrentYear();
+        const records = await API.loadRecords();
+        const filtered = records.filter((r) => {
+            const [ry, rm] = r.date.split("-");
+            return parseInt(rm) - 1 === month && parseInt(ry) === year;
+        });
+
+        Renderers.renderSidebarTotal(filtered);
+        Renderers.renderList(filtered, CATS, INCOME_CATS, renderAll);
+        Renderers.renderCategoryBars(filtered, CATS);
+        Renderers.renderFilters(filtered, CATS, INCOME_CATS, (id) => {
+            Renderers.renderList(filtered, CATS, INCOME_CATS, renderAll, id);
+        });
+
+        const expenses = filtered.filter((r) => r.type === "expense");
+        const ctx = document.getElementById(
+            "expense-chart",
+        ) as HTMLCanvasElement;
+        if (ctx && typeof Chart !== "undefined") {
+            const catTotals: Record<string, number> = {};
+            expenses.forEach((e) => {
+                catTotals[e.categoryId] =
+                    (catTotals[e.categoryId] || 0) + e.amount;
+            });
+
+            const labels = Object.keys(catTotals).map((k) =>
+                CATS[k] ? CATS[k].label : k,
+            );
+            const data = Object.values(catTotals);
+            const colors = Object.keys(catTotals).map((k) =>
+                CATS[k] ? CATS[k].color : "#64748b",
+            );
+
+            expenseChart?.destroy?.();
+            expenseChart = new Chart(ctx, {
+                type: "pie",
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            data,
+                            backgroundColor: colors,
+                            borderWidth: 0,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 1,
+                    plugins: {
+                        legend: { position: "right" },
+                    },
+                },
+            });
+        }
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+        UI.initSidebar();
+        const hasUser = await API.requireUser();
+        if (!hasUser) return;
+        const { CATS: c, INCOME_CATS: ic } = await API.loadCategories();
+        CATS = c;
+        INCOME_CATS = ic;
+        UI.initMonthNavigation(renderAll);
+        UI.bindDataRefresh(renderAll);
+        renderAll();
+    });
+</script>

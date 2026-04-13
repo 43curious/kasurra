@@ -1,0 +1,117 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import IncomeAdd from "../components/IncomeAdd.astro";
+import ExpenseList from "../components/ExpenseList.astro";
+---
+
+<AppLayout title="Income Management — Kasurra" pageTitle="Income" pageSubtitle="Log incoming money and compare it against the month.">
+    <div class="dashboard-layout" id="dashboard-layout">
+        <div class="dashboard-left" id="dashboard-left">
+            <div class="income-add-wrap">
+                <IncomeAdd />
+            </div>
+        </div>
+
+        <div class="dashboard-right" id="dashboard-right">
+            <ExpenseList defaultTab="records" showCategories={false} />
+        </div>
+    </div>
+</AppLayout>
+
+<script>
+    import { API } from '../lib/api';
+    import { Store } from '../lib/store';
+    import { UI } from '../lib/ui-utils';
+    import { Renderers } from '../lib/renderers';
+    import type { CategoryMap, Record } from '../lib/types';
+
+    let CATS: CategoryMap = {};
+    let INCOME_CATS: CategoryMap = {};
+
+    async function renderAll() {
+        const month = Store.getCurrentMonth();
+        const year = Store.getCurrentYear();
+        const all = await API.loadRecords();
+
+        const filteredByMonth = all.filter(r => {
+            const [y, m] = r.date.split('-');
+            return parseInt(m) - 1 === month && parseInt(y) === year;
+        });
+
+        Renderers.renderStats(filteredByMonth, 'income', month, year);
+        Renderers.renderSidebarTotal(filteredByMonth);
+
+        const displayList = filteredByMonth.filter(r => r.type === 'income');
+        displayList.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        Renderers.renderFilters(displayList, CATS, INCOME_CATS, (id) => {
+            Renderers.renderList(displayList, CATS, INCOME_CATS, renderAll, id);
+        });
+
+        Renderers.renderList(displayList, CATS, INCOME_CATS, renderAll);
+    }
+
+    async function handleConfirmIncome() {
+        const nameEl = document.getElementById('i-name') as HTMLInputElement;
+        const amtEl = document.getElementById('i-amount') as HTMLInputElement;
+        const catEl = document.getElementById('i-category') as HTMLSelectElement;
+        const dateEl = document.getElementById('i-date') as HTMLInputElement;
+
+        if (!nameEl?.value || !amtEl?.value) return;
+        const amount = parseFloat(amtEl.value);
+        if (!Number.isFinite(amount) || amount < 0) {
+            UI.showToast('Amount must be zero or more');
+            return;
+        }
+
+        const record = {
+            type: 'income' as const,
+            name: nameEl.value,
+            amount,
+            categoryId: catEl.value,
+            date: dateEl.value,
+            created: new Date().toISOString()
+        };
+
+        await API.addRecord(record);
+        nameEl.value = '';
+        amtEl.value = '';
+        UI.showToast(`✓ Logged Income: ${record.name}`);
+        renderAll();
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        UI.initSidebar();
+        
+        const hasUser = await API.requireUser();
+        if (!hasUser) return;
+
+        const { CATS: c, INCOME_CATS: ic } = await API.loadCategories();
+        CATS = c;
+        INCOME_CATS = ic;
+
+        const iCat = document.getElementById('i-category');
+        if (iCat) {
+            iCat.innerHTML = Object.entries(INCOME_CATS).map(([id, cat]) => 
+                `<option value="${id}">${cat.emoji} ${cat.label}</option>`
+            ).join('');
+        }
+
+        const btnConfirmI = document.getElementById('btn-confirm-income');
+        if (btnConfirmI) btnConfirmI.onclick = handleConfirmIncome;
+
+        document.getElementById('btn-discard-income')?.addEventListener('click', () => {
+            const nameEl = document.getElementById('i-name') as HTMLInputElement;
+            const amtEl = document.getElementById('i-amount') as HTMLInputElement;
+            const dateEl = document.getElementById('i-date') as HTMLInputElement;
+            nameEl.value = '';
+            amtEl.value = '';
+            dateEl.value = new Date().toISOString().split('T')[0];
+        });
+
+        UI.initDateInputBounds('i-date');
+        UI.initMonthNavigation(renderAll);
+        UI.bindDataRefresh(renderAll);
+        renderAll();
+    });
+</script>

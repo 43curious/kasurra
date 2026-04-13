@@ -1,0 +1,41 @@
+---
+interface Props {
+    user?: {
+        name: string;
+        email: string;
+    } | null;
+    pageTitle?: string;
+    pageSubtitle?: string;
+    showMonthNavigation?: boolean;
+}
+
+const { user, pageTitle = 'Dashboard', pageSubtitle, showMonthNavigation = true } = Astro.props;
+---
+<div class="topbar">
+    <header>
+        <h1 class="page-title">{pageTitle}</h1>
+        <p class="page-subtitle">
+            {pageSubtitle || (user ? `Signed in as ${user.name}` : 'Track every euro with your private budget workspace.')}
+        </p>
+    </header>
+    <div class="topbar-actions">
+        {showMonthNavigation && (
+            <div class="month-nav">
+                <button id="btn-prev-month">←</button>
+                <div class="current-month" id="month-display">—</div>
+                <button id="btn-next-month">→</button>
+            </div>
+        )}
+        <form method="post" action="/api/auth/logout" id="logout-form">
+            <button class="btn-discard" type="submit">Logout</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.getElementById('logout-form')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/login';
+    });
+</script>

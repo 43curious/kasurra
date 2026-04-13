@@ -1,0 +1,66 @@
+---
+import Layout from "./Layout.astro";
+import Sidebar from "../components/Sidebar.astro";
+import TopBar from "../components/TopBar.astro";
+import StatsRow from "../components/StatsRow.astro";
+import Toast from "../components/Toast.astro";
+
+interface Props {
+    title?: string;
+    suppressStats?: boolean;
+    pageTitle?: string;
+    pageSubtitle?: string;
+    showMonthNavigation?: boolean;
+}
+
+const {
+    title,
+    suppressStats = false,
+    pageTitle = "Dashboard",
+    pageSubtitle,
+    showMonthNavigation = true
+} = Astro.props;
+const user = Astro.locals.user;
+---
+
+<Layout title={title}>
+    <div class="app">
+        <Sidebar />
+        <button
+            class="sidebar-backdrop"
+            id="sidebar-backdrop"
+            type="button"
+            aria-label="Close navigation"
+        ></button>
+
+        <main class="main">
+            <div class="main-shell">
+                <button
+                    class="mobile-sidebar-toggle"
+                    id="sidebar-toggle-mobile"
+                    type="button"
+                    aria-label="Toggle Sidebar"
+                >
+                    <div class="hamburger">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <strong>Menu</strong>
+                </button>
+                <TopBar
+                    user={user}
+                    pageTitle={pageTitle}
+                    pageSubtitle={pageSubtitle}
+                    showMonthNavigation={showMonthNavigation}
+                />
+                {!suppressStats && <StatsRow />}
+                <section class="page-body">
+                    <slot />
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <Toast />
+</Layout>

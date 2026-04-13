@@ -1,0 +1,52 @@
+---
+---
+
+<section class="add-section income-entry" id="income-entry">
+    <h3>
+        Add Income
+        <span class="badge">Monthly flow</span>
+    </h3>
+
+    <div class="parsed-preview visible">
+        <div class="parsed-grid">
+            <div class="parsed-field">
+                <label for="i-name">Source Name</label>
+                <input type="text" id="i-name" placeholder="Salary, Bonus, Sell..." />
+            </div>
+            <div class="parsed-field">
+                <label for="i-amount">Amount (€)</label>
+                <input type="number" id="i-amount" step="0.01" min="0" placeholder="0.00" />
+            </div>
+            <div class="parsed-field">
+                <label for="i-date">Date</label>
+                <input type="date" id="i-date" />
+            </div>
+            <div class="parsed-field">
+                <label for="i-category">Category</label>
+                <select id="i-category">
+                    <option value="salary">Salary / Wages</option>
+                    <option value="freelance">Freelance / Gig</option>
+                    <option value="gift">Gift / Bonus</option>
+                    <option value="investment">Investment</option>
+                    <option value="other">Other Income</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="confirm-row">
+            <button class="btn-confirm" id="btn-confirm-income">Add Income</button>
+            <button class="btn-discard" id="btn-discard-income">Clear</button>
+        </div>
+    </div>
+</section>
+
+<script>
+    // Initial date setup
+    const dateInput = document.getElementById('i-date') as HTMLInputElement;
+    if (dateInput) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.min = '2015-01-01';
+        dateInput.max = today;
+        dateInput.value = today;
+    }
+</script>

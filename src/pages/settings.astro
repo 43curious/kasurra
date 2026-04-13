@@ -1,0 +1,316 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+
+const user = Astro.locals.user;
+---
+
+<AppLayout
+    title="Settings — Kasurra"
+    suppressStats={true}
+    pageTitle="Settings"
+    pageSubtitle="Manage your account, workspace behavior, and budgeting data."
+>
+    <div class="settings-page">
+        <section class="settings-grid">
+            <article class="settings-card">
+                <div class="settings-card-head">
+                    <div>
+                        <p class="settings-eyebrow">Account</p>
+                        <h2>Your profile</h2>
+                    </div>
+                    <span class="settings-badge">Saved to your account</span>
+                </div>
+                <p class="settings-copy">Keep the name shown across your budget workspace up to date.</p>
+                <label class="settings-field">
+                    <span>Name</span>
+                    <input type="text" id="settings-name" value={user?.name ?? ''} />
+                </label>
+                <label class="settings-field">
+                    <span>Email</span>
+                    <input type="email" value={user?.email ?? ''} disabled />
+                </label>
+                <button id="btn-update-user" class="btn-confirm">Save profile</button>
+            </article>
+
+            <article class="settings-card">
+                <div class="settings-card-head">
+                    <div>
+                        <p class="settings-eyebrow">Workspace</p>
+                        <h2>Sidebar behavior</h2>
+                    </div>
+                </div>
+                <p class="settings-copy">Choose how much room the navigation takes by default.</p>
+                <label class="settings-toggle">
+                    <div>
+                        <strong>Start with collapsed sidebar</strong>
+                        <span>Helpful when you want more room for charts and tables.</span>
+                    </div>
+                    <input type="checkbox" id="settings-sidebar-collapsed" />
+                </label>
+            </article>
+
+            <article class="settings-card">
+                <div class="settings-card-head">
+                    <div>
+                        <p class="settings-eyebrow">Data</p>
+                        <h2>Export your budget</h2>
+                    </div>
+                </div>
+                <p class="settings-copy">Download your records, categories, pools, and account summary as a JSON file.</p>
+                <button id="btn-export" class="btn-confirm">Export JSON</button>
+            </article>
+
+            <article class="settings-card danger-card">
+                <div class="settings-card-head">
+                    <div>
+                        <p class="settings-eyebrow">Danger zone</p>
+                        <h2>Clear budgeting data</h2>
+                    </div>
+                </div>
+                <p class="settings-copy">Remove all records, pools, and custom categories from this account and restore the default category set.</p>
+                <button id="btn-clear" class="btn-discard">Clear all data</button>
+            </article>
+
+            <article class="settings-card">
+                <div class="settings-card-head">
+                    <div>
+                        <p class="settings-eyebrow">Session</p>
+                        <h2>Sign out</h2>
+                    </div>
+                </div>
+                <p class="settings-copy">End this session on the current browser.</p>
+                <form method="post" action="/api/auth/logout" id="logout-form-settings">
+                    <button class="btn-discard" type="submit">Logout</button>
+                </form>
+            </article>
+        </section>
+    </div>
+</AppLayout>
+
+<style is:global>
+    .settings-page {
+        padding-bottom: 40px;
+    }
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 24px;
+    }
+    .settings-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+    .settings-card-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 16px;
+    }
+    .settings-card h2 {
+        margin: 4px 0 0;
+        font-family: 'Playfair Display', serif;
+        font-size: 28px;
+        line-height: 1.1;
+    }
+    .settings-eyebrow {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        font-weight: 700;
+    }
+    .settings-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .settings-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+    }
+    .settings-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-weight: 600;
+        color: var(--text);
+    }
+    .settings-field input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface2);
+        color: var(--text);
+    }
+    .settings-field input:disabled {
+        color: var(--muted);
+        cursor: not-allowed;
+    }
+    .settings-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface2);
+    }
+    .settings-toggle strong {
+        display: block;
+        margin-bottom: 4px;
+    }
+    .settings-toggle span {
+        color: var(--muted);
+        font-size: 13px;
+    }
+    .settings-toggle input {
+        width: 22px;
+        height: 22px;
+        accent-color: var(--accent);
+        flex-shrink: 0;
+    }
+    .danger-card {
+        border-color: rgba(220, 38, 38, 0.22);
+        background: linear-gradient(180deg, rgba(220, 38, 38, 0.05), transparent 65%), var(--surface);
+    }
+    #logout-form-settings {
+        margin: 0;
+    }
+    #logout-form-settings button,
+    #btn-update-user,
+    #btn-export,
+    #btn-clear {
+        width: fit-content;
+        min-width: 160px;
+    }
+    @media (max-width: 960px) {
+        .settings-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    @media (max-width: 640px) {
+        .settings-card {
+            padding: 22px;
+        }
+        .settings-card-head {
+            flex-direction: column;
+        }
+        .settings-toggle {
+            flex-direction: column;
+            align-items: start;
+        }
+        #logout-form-settings button,
+        #btn-update-user,
+        #btn-export,
+        #btn-clear {
+            width: 100%;
+        }
+    }
+</style>
+
+<script>
+    import { API } from '../lib/api';
+    import { Store } from '../lib/store';
+    import { UI } from '../lib/ui-utils';
+
+    async function exportBudgetData() {
+        const [user, categories, records, pools] = await Promise.all([
+            API.getUser(),
+            API.loadCategoryList(),
+            API.loadRecords(),
+            API.loadPools(Store.getCurrentYear())
+        ]);
+
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            user,
+            categories,
+            records,
+            pools
+        };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        const dateLabel = new Date().toISOString().slice(0, 10);
+        anchor.href = url;
+        anchor.download = `kasurra-export-${dateLabel}.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        UI.initSidebar();
+
+        const nameInput = document.getElementById('settings-name') as HTMLInputElement | null;
+        const btnUpdate = document.getElementById('btn-update-user') as HTMLButtonElement | null;
+        const btnExport = document.getElementById('btn-export') as HTMLButtonElement | null;
+        const btnClear = document.getElementById('btn-clear') as HTMLButtonElement | null;
+        const sidebarToggle = document.getElementById('settings-sidebar-collapsed') as HTMLInputElement | null;
+        const logoutForm = document.getElementById('logout-form-settings') as HTMLFormElement | null;
+
+        if (sidebarToggle) {
+            sidebarToggle.checked = Store.getSidebarCollapsed();
+            sidebarToggle.addEventListener('change', () => {
+                Store.setSidebarCollapsed(sidebarToggle.checked);
+                UI.showToast('Sidebar preference saved');
+            });
+        }
+
+        btnUpdate?.addEventListener('click', async () => {
+            const name = nameInput?.value.trim() ?? '';
+            if (!name) return UI.showToast('Please enter your name');
+
+            try {
+                await API.updateUser(name);
+                UI.showToast('Profile updated');
+            } catch (error) {
+                UI.showToast(error instanceof Error ? error.message : 'Could not update profile');
+            }
+        });
+
+        btnExport?.addEventListener('click', async () => {
+            try {
+                await exportBudgetData();
+                UI.showToast('Export started');
+            } catch (error) {
+                UI.showToast(error instanceof Error ? error.message : 'Could not export your data');
+            }
+        });
+
+        btnClear?.addEventListener('click', async () => {
+            const confirmed = confirm('Clear all records, pools, and custom categories for this account? Default categories will be restored.');
+            if (!confirmed) return;
+
+            try {
+                await API.clearAllData();
+                UI.showToast('Budget data cleared');
+            } catch (error) {
+                UI.showToast(error instanceof Error ? error.message : 'Could not clear your data');
+            }
+        });
+
+        logoutForm?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+        });
+    });
+</script>

@@ -1,0 +1,2 @@
+- How the fuck we do the ahorros. Me quiero comprar un iPhone? Cómo gestiono la app para que tenga sentido? 
+- Yearly, añadir que puedas añadir un pool para el tu dinero hasta ahora y que sube los rollover acumulados?

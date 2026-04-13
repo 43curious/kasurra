@@ -1,0 +1,14 @@
+[
+    { "id": "i1", "type": "income", "name": "Monthly Salary", "amount": 2800.00, "category": "salary", "date": "2026-04-01" },
+    { "id": "i2", "type": "income", "name": "Freelance Project", "amount": 450.00, "category": "freelance", "date": "2026-04-10" },
+    { "id": "e1", "type": "expense", "name": "Monthly Rent", "amount": 950.00, "category": "home", "location": "Madrid Center", "date": "2026-04-01" },
+    { "id": "e2", "type": "expense", "name": "Internet & Utilities", "amount": 85.00, "category": "home", "location": "Online", "date": "2026-04-03" },
+    { "id": "e3", "type": "expense", "name": "Mercadona Weekly Shop", "amount": 76.40, "category": "food", "location": "Barcelona", "date": "2026-04-04" },
+    { "id": "e4", "type": "expense", "name": "Uber to Airport", "amount": 35.00, "category": "transport", "location": "MAD Airport", "date": "2026-04-05" },
+    { "id": "e5", "type": "expense", "name": "Netflix & Spotify", "amount": 28.98, "category": "entertainment", "location": "Online", "date": "2026-04-06" },
+    { "id": "e6", "type": "expense", "name": "Zara New Collection", "amount": 120.00, "category": "shopping", "location": "Gran Via", "date": "2026-04-08" },
+    { "id": "e7", "type": "expense", "name": "Gym Membership", "amount": 45.00, "category": "health", "location": "Local Gym", "date": "2026-04-02" },
+    { "id": "e8", "type": "expense", "name": "Pharmacy", "amount": 12.50, "category": "health", "location": "Madrid", "date": "2026-04-07" },
+    { "id": "e9", "type": "expense", "name": "Dinner with Friends", "amount": 65.00, "category": "food", "location": "Tapa Bar", "date": "2026-04-12" },
+    { "id": "e10", "type": "expense", "name": "Public Transport Pass", "amount": 40.00, "category": "transport", "location": "City Centre", "date": "2026-04-01" }
+]

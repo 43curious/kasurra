@@ -1,0 +1,203 @@
+---
+interface Props {
+    defaultTab?: "records" | "categories";
+    showCategories?: boolean;
+    categoriesTabFirst?: boolean;
+}
+
+const {
+    defaultTab = "categories",
+    showCategories = true,
+    categoriesTabFirst = false,
+} = Astro.props;
+const recordsActive = defaultTab === "records" || !showCategories;
+const categoriesActive = showCategories && defaultTab === "categories";
+---
+
+<section
+    class="content-view dashboard-right"
+    id="records-panel"
+    data-active-tab={recordsActive ? "records" : "categories"}
+    data-categories-first={categoriesTabFirst ? "true" : "false"}
+    aria-label="Records and Analytics"
+>
+    <!-- Tab Switcher -->
+    <div
+        class="panel-tabs"
+        style={showCategories ? undefined : "display: none;"}
+    >
+        {
+            categoriesTabFirst ? (
+                <>
+                    <button
+                        class={`panel-tab ${categoriesActive ? "active" : ""}`}
+                        data-tab="categories">By categories</button
+                    >
+                    <button
+                        class={`panel-tab ${recordsActive ? "active" : ""}`}
+                        data-tab="records">Records</button
+                    >
+                </>
+            ) : (
+                <>
+                    <button
+                        class={`panel-tab ${recordsActive ? "active" : ""}`}
+                        data-tab="records">Records</button
+                    >
+                    <button
+                        class={`panel-tab ${categoriesActive ? "active" : ""}`}
+                        data-tab="categories">By categories</button
+                    >
+                </>
+            )
+        }
+        <div class="tab-indicator"></div>
+    </div>
+
+    <!-- Records View -->
+    <div
+        id="view-records"
+        class={`panel-view ${recordsActive ? "active" : ""}`}
+    >
+        <div class="list-header">
+            <div class="filter-pills">
+                <!-- Dynamically injected by Renderers.renderFilters -->
+            </div>
+        </div>
+        <div class="expense-list" id="expense-list"></div>
+    </div>
+
+    <!-- Categories View -->
+    {
+        showCategories && (
+            <div
+                id="view-categories"
+                class={`panel-view ${categoriesActive ? "active" : ""}`}
+            >
+                <div class="categories-panel">
+                    <div class="cat-row" id="cat-bars" />
+                </div>
+            </div>
+        )
+    }
+</section>
+
+<script>
+    function initRecordPanel() {
+        const panel = document.getElementById("records-panel");
+        if (!panel) return;
+
+        const tabs = panel.querySelectorAll(".panel-tab");
+        const recordsView = panel.querySelector("#view-records");
+        const categoriesView = panel.querySelector("#view-categories");
+
+        tabs.forEach((tab) => {
+            tab.addEventListener("click", () => {
+                const activeTab = (tab as HTMLElement).dataset.tab || "records";
+                panel.dataset.activeTab = activeTab;
+                tabs.forEach((item) =>
+                    item.classList.toggle("active", item === tab),
+                );
+                recordsView?.classList.toggle(
+                    "active",
+                    activeTab === "records",
+                );
+                categoriesView?.classList.toggle(
+                    "active",
+                    activeTab === "categories",
+                );
+            });
+        });
+    }
+
+    window.addEventListener("DOMContentLoaded", initRecordPanel);
+</script>
+
+<style>
+    .panel-tabs {
+        display: flex;
+        background: var(--surface2);
+        padding: 4px;
+        border-radius: 12px;
+        position: relative;
+        margin-bottom: 14px;
+        border: 1px solid var(--border);
+    }
+
+    .panel-tab {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        z-index: 1;
+        transition: color 0.3s;
+    }
+
+    .panel-tab.active {
+        color: var(--text);
+    }
+
+    .tab-indicator {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        height: calc(100% - 8px);
+        width: calc(50% - 4px);
+        background: var(--surface);
+        border-radius: 9px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 0;
+    }
+
+    :global(#records-panel:not([data-categories-first="true"])[data-active-tab="categories"]) .tab-indicator {
+        transform: translateX(100%);
+    }
+
+    :global(#records-panel[data-categories-first="true"][data-active-tab="records"]) .tab-indicator {
+        transform: translateX(100%);
+    }
+
+    .panel-view {
+        display: none;
+    }
+
+    .panel-view.active {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        flex-direction: column;
+    }
+
+    .categories-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px;
+        box-shadow: var(--shadow);
+        min-height: auto;
+    }
+
+    /* Override for the filtered pills to look better on one line if possible */
+    .filter-pills {
+        margin-bottom: 10px;
+    }
+
+    #records-panel {
+        min-height: auto;
+    }
+
+    #view-records {
+        min-height: 0;
+    }
+
+    @media (max-height: 900px) {
+        .panel-tabs {
+            margin-bottom: 10px;
+        }
+    }
+</style>
