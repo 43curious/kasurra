@@ -3,7 +3,7 @@ import type { AstroCookies } from 'astro';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import db, { seedDefaultCategories } from './db';
 
-export const SESSION_COOKIE = 'kasurra_session';
+export const SESSION_COOKIE = 'zeken_session';
 const SESSION_DAYS = 14;
 
 export interface AuthUser {
@@ -11,6 +11,7 @@ export interface AuthUser {
   name: string;
   email: string;
   bankBalance: number;
+  role: 'user' | 'admin';
 }
 
 interface StoredUser extends AuthUser {
@@ -47,30 +48,47 @@ export function verifyPassword(password: string, stored: string) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-export function createUser(name: string, email: string, password: string): AuthUser {
+export async function createUser(name: string, email: string, password: string, role: 'user' | 'admin' = 'user'): Promise<AuthUser> {
   const id = crypto.randomUUID();
   const passwordHash = hashPassword(password);
 
-  const create = db.transaction(() => {
-    db.prepare('INSERT INTO users (id, name, email, passwordHash) VALUES (?, ?, ?, ?)').run(id, name, email, passwordHash);
-    seedDefaultCategories(id);
+  await db.execute({
+    sql: 'INSERT INTO users (id, name, email, passwordHash, role) VALUES (?, ?, ?, ?, ?)',
+    args: [id, name, email, passwordHash, role]
   });
-
-  create();
-  return { id, name, email, bankBalance: 0 };
+  
+  await seedDefaultCategories(id);
+  
+  return { id, name, email, bankBalance: 0, role };
 }
 
-export function findUserByEmail(email: string): StoredUser | undefined {
-  return db
-    .prepare('SELECT id, name, email, bankBalance, passwordHash FROM users WHERE email = ? AND passwordHash IS NOT NULL')
-    .get(email) as StoredUser | undefined;
+export async function findUserByEmail(email: string): Promise<StoredUser | undefined> {
+  const res = await db.execute({
+    sql: 'SELECT id, name, email, bankBalance, role, passwordHash FROM users WHERE email = ? AND passwordHash IS NOT NULL',
+    args: [email]
+  });
+  
+  if (res.rows.length === 0) return undefined;
+  
+  const row = res.rows[0];
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    email: row.email as string,
+    bankBalance: Number(row.bankBalance),
+    role: row.role as 'user' | 'admin',
+    passwordHash: row.passwordHash as string
+  };
 }
 
-export function createSession(cookies: AstroCookies, userId: string) {
+export async function createSession(cookies: AstroCookies, userId: string) {
   const id = randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
-  db.prepare('INSERT INTO sessions (id, userId, expiresAt) VALUES (?, ?, ?)').run(id, userId, expiresAt.toISOString());
+  await db.execute({
+    sql: 'INSERT INTO sessions (id, userId, expiresAt) VALUES (?, ?, ?)',
+    args: [id, userId, expiresAt.toISOString()]
+  });
 
   cookies.set(SESSION_COOKIE, id, {
     httpOnly: true,
@@ -81,41 +99,58 @@ export function createSession(cookies: AstroCookies, userId: string) {
   });
 }
 
-export function clearSession(cookies: AstroCookies) {
+export async function clearSession(cookies: AstroCookies) {
   const sessionId = cookies.get(SESSION_COOKIE)?.value;
   if (sessionId) {
-    db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+    await db.execute({
+      sql: 'DELETE FROM sessions WHERE id = ?',
+      args: [sessionId]
+    });
   }
 
   cookies.delete(SESSION_COOKIE, { path: '/' });
 }
 
-export function getCurrentUser(cookies: AstroCookies): AuthUser | null {
+export async function getCurrentUser(cookies: AstroCookies): Promise<AuthUser | null> {
   const sessionId = cookies.get(SESSION_COOKIE)?.value;
   if (!sessionId) return null;
 
-  const user = db
-    .prepare(
-      `SELECT users.id, users.name, users.email, users.bankBalance
+  const res = await db.execute({
+    sql: `SELECT users.id, users.name, users.email, users.bankBalance, users.role
        FROM sessions
        JOIN users ON users.id = sessions.userId
-       WHERE sessions.id = ? AND sessions.expiresAt > ?`
-    )
-    .get(sessionId, new Date().toISOString()) as AuthUser | undefined;
+       WHERE sessions.id = ? AND sessions.expiresAt > ?`,
+    args: [sessionId, new Date().toISOString()]
+  });
 
-  if (!user) {
+  if (res.rows.length === 0) {
     cookies.delete(SESSION_COOKIE, { path: '/' });
     return null;
   }
 
-  return user;
+  const row = res.rows[0];
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    email: row.email as string,
+    bankBalance: Number(row.bankBalance),
+    role: row.role as 'user' | 'admin'
+  };
 }
 
-export function requireCurrentUser(cookies: AstroCookies) {
-  const user = getCurrentUser(cookies);
+export async function requireCurrentUser(cookies: AstroCookies) {
+  const user = await getCurrentUser(cookies);
   if (!user) {
     return { user: null, response: json({ error: 'You need to log in first.' }, { status: 401 }) };
   }
 
+  return { user, response: null };
+}
+
+export async function requireAdmin(cookies: AstroCookies) {
+  const user = await getCurrentUser(cookies);
+  if (!user || user.role !== 'admin') {
+    return { user: null, response: json({ error: 'Forbidden. Admin access required.' }, { status: 403 }) };
+  }
   return { user, response: null };
 }

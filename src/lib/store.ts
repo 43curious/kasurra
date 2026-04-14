@@ -1,6 +1,6 @@
-export const STORAGE_KEY = 'kasurra_v2_storage';
-const MONTH_KEY = 'kasurra_current_month';
-const YEAR_KEY = 'kasurra_current_year';
+export const STORAGE_KEY = 'zeken_v2_storage';
+const MONTH_KEY = 'zeken_current_month';
+const YEAR_KEY = 'zeken_current_year';
 export const MIN_YEAR = 2015;
 export const MAX_YEAR = 2100;
 
@@ -54,9 +54,9 @@ export const Store = {
     },
 
     getSidebarCollapsed(): boolean {
-        return localStorage.getItem('kasurra_sidebar_collapsed') === 'true';
+        return localStorage.getItem('zeken_sidebar_collapsed') === 'true';
     },
     setSidebarCollapsed(collapsed: boolean) {
-        localStorage.setItem('kasurra_sidebar_collapsed', collapsed.toString());
+        localStorage.setItem('zeken_sidebar_collapsed', collapsed.toString());
     }
 };

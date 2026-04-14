@@ -1,7 +1,7 @@
 import { STORAGE_KEY } from './store';
 import type { Record, Category, User, CategoryMap, Pool } from './types';
 
-const DATA_EVENT = 'kasurra:data-changed';
+const DATA_EVENT = 'zeken:data-changed';
 
 function notifyDataChanged() {
     localStorage.setItem(DATA_EVENT, Date.now().toString());

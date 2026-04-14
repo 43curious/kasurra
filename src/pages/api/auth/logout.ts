@@ -1,7 +1,7 @@
-import type { AstroCookies } from 'astro';
 import { clearSession, json } from '../../../lib/server-auth';
+import type { AstroCookies } from 'astro';
 
 export async function POST({ cookies }: { cookies: AstroCookies }) {
-  clearSession(cookies);
+  await clearSession(cookies);
   return json({ success: true });
 }

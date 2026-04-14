@@ -153,9 +153,9 @@ export const UI = {
     bindDataRefresh(onChange: () => void) {
         const rerender = () => void onChange();
         window.addEventListener('pageshow', rerender);
-        window.addEventListener('kasurra:data-changed', rerender as EventListener);
+        window.addEventListener('zeken:data-changed', rerender as EventListener);
         window.addEventListener('storage', (event) => {
-            if (event.key === 'kasurra:data-changed') {
+            if (event.key === 'zeken:data-changed') {
                 rerender();
             }
         });

@@ -1,127 +1,107 @@
-import type { AstroCookies } from 'astro';
 import db from '../../lib/db';
 import { json, requireCurrentUser } from '../../lib/server-auth';
-
-type CategoryType = 'expense' | 'income';
-
-function isCategoryType(value: unknown): value is CategoryType {
-  return value === 'expense' || value === 'income';
-}
+import type { AstroCookies } from 'astro';
 
 export async function GET({ cookies }: { cookies: AstroCookies }) {
-  const { user, response } = requireCurrentUser(cookies);
+  const { user, response } = await requireCurrentUser(cookies);
   if (!user) return response;
 
-  const categories = db
-    .prepare('SELECT * FROM categories WHERE userId = ? ORDER BY type, sortOrder, name')
-    .all(user.id);
+  const res = await db.execute({
+    sql: 'SELECT * FROM categories WHERE userId = ? ORDER BY sortOrder ASC, name ASC',
+    args: [user.id]
+  });
 
-  return json(categories);
+  return json(res.rows);
 }
 
 export async function POST({ request, cookies }: { request: Request; cookies: AstroCookies }) {
-  const { user, response } = requireCurrentUser(cookies);
+  const { user, response } = await requireCurrentUser(cookies);
   if (!user) return response;
 
   const data = await request.json();
   const type = data.type;
   const name = String(data.name ?? '').trim();
-  const emoji = String(data.emoji ?? '•').trim().slice(0, 8);
+  const emoji = String(data.emoji ?? '📦').trim();
   const color = String(data.color ?? '#64748b').trim();
 
-  if (!isCategoryType(type) || !name) {
-    return json({ error: 'Please provide a valid category type and name.' }, { status: 400 });
+  if (!name || (type !== 'expense' && type !== 'income')) {
+    return json({ error: 'Valid name and type are required.' }, { status: 400 });
   }
 
+  // Get max sortOrder for user and type
+  const maxRes = await db.execute({
+    sql: 'SELECT MAX(sortOrder) as maxSort FROM categories WHERE userId = ? AND type = ?',
+    args: [user.id, type]
+  });
+  const maxSort = Number(maxRes.rows[0].maxSort ?? -1);
+
   const id = crypto.randomUUID();
-  const nextOrderRow = db
-    .prepare('SELECT COALESCE(MAX(sortOrder), -1) AS maxOrder FROM categories WHERE userId = ? AND type = ?')
-    .get(user.id, type) as { maxOrder: number };
-  db.prepare(
-    `INSERT INTO categories (id, userId, type, name, emoji, color, sortOrder)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, user.id, type, name, emoji || '•', color, nextOrderRow.maxOrder + 1);
+  await db.execute({
+    sql: 'INSERT INTO categories (id, userId, type, name, emoji, color, sortOrder) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    args: [id, user.id, type, name, emoji, color, maxSort + 1]
+  });
 
   return json({ id, success: true }, { status: 201 });
 }
 
 export async function PATCH({ request, cookies }: { request: Request; cookies: AstroCookies }) {
-  const { user, response } = requireCurrentUser(cookies);
+  const { user, response } = await requireCurrentUser(cookies);
   if (!user) return response;
 
   const data = await request.json();
-  const type = data.type;
-  const id = typeof data.id === 'string' ? data.id : '';
+  const { id, type, name, emoji, color, orderedIds } = data;
 
-  if (!isCategoryType(type)) {
-    return json({ error: 'A valid category type is required.' }, { status: 400 });
-  }
-
-  if (id) {
-    const name = String(data.name ?? '').trim();
-    const emoji = String(data.emoji ?? '•').trim().slice(0, 8);
-    const color = String(data.color ?? '#64748b').trim();
-
-    if (!name) {
-      return json({ error: 'Category name is required.' }, { status: 400 });
+  if (orderedIds && Array.isArray(orderedIds)) {
+    // Reorder logic
+    if (type !== 'expense' && type !== 'income') {
+        return json({ error: 'Type is required for reordering.' }, { status: 400 });
     }
 
-    const updated = db
-      .prepare('UPDATE categories SET name = ?, emoji = ?, color = ? WHERE id = ? AND userId = ? AND type = ?')
-      .run(name, emoji || '•', color, id, user.id, type);
-
-    return json({ success: updated.changes > 0 });
-  }
-
-  const orderedIds = Array.isArray(data.orderedIds) ? data.orderedIds.filter((entry): entry is string => typeof entry === 'string') : [];
-  if (orderedIds.length === 0) {
-    return json({ error: 'A category id or ordered ids are required.' }, { status: 400 });
-  }
-
-  const categories = db.prepare('SELECT id FROM categories WHERE userId = ? AND type = ?').all(user.id, type) as Array<{ id: string }>;
-  if (categories.length !== orderedIds.length || categories.some(({ id: categoryId }) => !orderedIds.includes(categoryId))) {
-    return json({ error: 'The category order is invalid.' }, { status: 400 });
-  }
-
-  db.transaction(() => {
-    orderedIds.forEach((orderedId, index) => {
-      db.prepare('UPDATE categories SET sortOrder = ? WHERE id = ? AND userId = ?').run(index, orderedId, user.id);
+    const batch: any[] = [];
+    orderedIds.forEach((catId, index) => {
+        batch.push({
+            sql: 'UPDATE categories SET sortOrder = ? WHERE id = ? AND userId = ? AND type = ?',
+            args: [index, catId, user.id, type]
+        });
     });
-  })();
+
+    await db.batch(batch, "write");
+    return json({ success: true });
+  }
+
+  if (!id || !name) {
+    return json({ error: 'ID and name are required.' }, { status: 400 });
+  }
+
+  await db.execute({
+    sql: 'UPDATE categories SET name = ?, emoji = ?, color = ? WHERE id = ? AND userId = ?',
+    args: [name, emoji, color, id, user.id]
+  });
 
   return json({ success: true });
 }
 
 export async function DELETE({ request, cookies }: { request: Request; cookies: AstroCookies }) {
-  const { user, response } = requireCurrentUser(cookies);
+  const { user, response } = await requireCurrentUser(cookies);
   if (!user) return response;
 
   const { id } = await request.json();
   if (!id) return json({ error: 'Category id is required.' }, { status: 400 });
 
-  const category = db
-    .prepare('SELECT id, type FROM categories WHERE id = ? AND userId = ?')
-    .get(id, user.id) as { id: string; type: CategoryType } | undefined;
+  // Before deleting, check if it's used in records
+  const countRes = await db.execute({
+    sql: 'SELECT count(*) as count FROM records WHERE categoryId = ? AND userId = ?',
+    args: [id, user.id]
+  });
+  
+  if (Number(countRes.rows[0].count) > 0) {
+    return json({ error: 'Category is in use and cannot be deleted.' }, { status: 400 });
+  }
 
-  if (!category) return json({ success: false });
-
-  const fallback = db
-    .prepare(
-      `SELECT id FROM categories
-       WHERE userId = ? AND type = ? AND lower(name) LIKE 'other%'
-       ORDER BY name
-       LIMIT 1`
-    )
-    .get(user.id, category.type) as { id: string } | undefined;
-
-  const removeCategory = db.transaction(() => {
-    if (fallback && fallback.id !== id) {
-      db.prepare('UPDATE records SET categoryId = ? WHERE userId = ? AND categoryId = ?').run(fallback.id, user.id, id);
-    }
-
-    db.prepare('DELETE FROM categories WHERE id = ? AND userId = ?').run(id, user.id);
+  await db.execute({
+    sql: 'DELETE FROM categories WHERE id = ? AND userId = ?',
+    args: [id, user.id]
   });
 
-  removeCategory();
   return json({ success: true });
 }

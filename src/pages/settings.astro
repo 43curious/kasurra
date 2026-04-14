@@ -5,7 +5,7 @@ const user = Astro.locals.user;
 ---
 
 <AppLayout
-    title="Settings — Kasurra"
+    title="Settings — Zeken"
     suppressStats={true}
     pageTitle="Settings"
     pageSubtitle="Manage your account, workspace behavior, and budgeting data."
@@ -249,7 +249,7 @@ const user = Astro.locals.user;
         const anchor = document.createElement('a');
         const dateLabel = new Date().toISOString().slice(0, 10);
         anchor.href = url;
-        anchor.download = `kasurra-export-${dateLabel}.json`;
+        anchor.download = `zeken-export-${dateLabel}.json`;
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
@@ -279,7 +279,7 @@ const user = Astro.locals.user;
             if (!name) return UI.showToast('Please enter your name');
 
             try {
-                await API.updateUser(name);
+                await API.updateUser({ name });
                 UI.showToast('Profile updated');
             } catch (error) {
                 UI.showToast(error instanceof Error ? error.message : 'Could not update profile');

@@ -64,6 +64,7 @@ export interface User {
     name: string;
     email: string;
     bankBalance: number;
+    role: 'user' | 'admin';
 }
 
 export type ViewType = 'dashboard' | 'income' | 'calendar' | 'all' | 'categories' | 'yearly' | 'setup';

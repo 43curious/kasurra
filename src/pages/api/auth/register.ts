@@ -1,26 +1,29 @@
+import { createUser, findUserByEmail, createSession, json } from '../../../lib/server-auth';
 import type { AstroCookies } from 'astro';
-import { createSession, createUser, findUserByEmail, json, normalizeEmail } from '../../../lib/server-auth';
+import db from '../../../lib/db';
 
 export async function POST({ request, cookies }: { request: Request; cookies: AstroCookies }) {
-  const data = await request.json();
-  const name = String(data.name ?? '').trim();
-  const email = normalizeEmail(String(data.email ?? ''));
-  const password = String(data.password ?? '');
+  const { name, email, password } = await request.json();
 
-  if (!name || !email || password.length < 8) {
-    return json({ error: 'Name, email, and a password of at least 8 characters are required.' }, { status: 400 });
+  if (!name || !email || !password) {
+    return json({ error: 'Name, email, and password are required.' }, { status: 400 });
   }
 
-  if (findUserByEmail(email)) {
-    return json({ error: 'An account already exists for that email.' }, { status: 409 });
+  const existingUser = await findUserByEmail(email);
+  if (existingUser) {
+    return json({ error: 'User already exists with this email.' }, { status: 400 });
   }
+
+  // Check if this is the first user
+  const userCountRes = await db.execute('SELECT count(*) as count FROM users');
+  const userCount = Number(userCountRes.rows[0].count);
+  const role = userCount === 0 ? 'admin' : 'user';
 
   try {
-    const user = createUser(name, email, password);
-    createSession(cookies, user.id);
-    return json({ user }, { status: 201 });
+    const user = await createUser(name, email, password, role);
+    await createSession(cookies, user.id);
+    return json({ success: true, user: { id: user.id, name: user.name, role: user.role } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Could not create account.';
-    return json({ error: message }, { status: 500 });
+    return json({ error: 'Could not create account.' }, { status: 500 });
   }
 }
